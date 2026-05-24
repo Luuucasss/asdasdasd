@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Streamer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f0f0f;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+
+    h1 { font-size: 1.6rem; font-weight: 600; margin-bottom: 24px; color: #fff; }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; justify-content: center; }
+
+    .tab {
+      padding: 10px 24px; border-radius: 8px; border: 1px solid #333;
+      background: #1a1a1a; color: #aaa; cursor: pointer; font-size: 0.9rem; transition: all 0.2s;
+    }
+    .tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+    .tab:hover:not(.active) { border-color: #555; color: #ddd; }
+
+    .panel {
+      display: none; flex-direction: column; align-items: center;
+      gap: 16px; width: 100%; max-width: 860px;
+    }
+    .panel.active { display: flex; }
+
+    video {
+      width: 100%; max-width: 860px; border-radius: 12px;
+      background: #000; aspect-ratio: 16/9; object-fit: contain;
+    }
+
+    iframe.player {
+      width: 100%; max-width: 860px; aspect-ratio: 16/9;
+      border: none; border-radius: 12px; background: #000;
+    }
+
+    .controls { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+    button {
+      padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 0.9rem; font-weight: 500; transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-danger  { background: #dc2626; color: #fff; }
+    .btn-neutral { background: #374151; color: #e0e0e0; }
+    .btn-twitch  { background: #9146ff; color: #fff; }
+
+    .file-label {
+      display: inline-block; padding: 10px 20px; border-radius: 8px;
+      background: #374151; color: #e0e0e0; cursor: pointer;
+      font-size: 0.9rem; font-weight: 500; transition: opacity 0.2s;
+    }
+    .file-label:hover { opacity: 0.85; }
+    input[type="file"] { display: none; }
+
+    input[type="text"] {
+      width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #333;
+      background: #1a1a1a; color: #e0e0e0; font-size: 0.9rem; outline: none;
+    }
+    input[type="text"]:focus { border-color: #2563eb; }
+
+    .url-row { display: flex; gap: 10px; width: 100%; }
+
+    .badge { font-size: 0.75rem; padding: 4px 10px; border-radius: 999px; font-weight: 600; }
+    .badge-live   { background: #dc2626; color: #fff; }
+    .badge-file   { background: #16a34a; color: #fff; }
+    .badge-twitch { background: #9146ff; color: #fff; }
+
+    .status { font-size: 0.82rem; color: #888; text-align: center; }
+    .info-row { display: flex; align-items: center; gap: 10px; }
+
+    .notice {
+      background: #1e1b2e; border: 1px solid #4c3a7a; border-radius: 8px;
+      padding: 12px 16px; font-size: 0.82rem; color: #c4b5fd; line-height: 1.5;
+      width: 100%; max-width: 860px;
+    }
+    .notice code { background: #2d2450; padding: 2px 6px; border-radius: 4px; }
+
+    .notice-warn {
+      background: #1c1a10; border: 1px solid #78620a; border-radius: 8px;
+      padding: 12px 16px; font-size: 0.82rem; color: #fbbf24; line-height: 1.5;
+      width: 100%; max-width: 860px;
+    }
+
+    .presets { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .preset {
+      padding: 6px 14px; border-radius: 6px; border: 1px solid #4c3a7a;
+      background: #1e1b2e; color: #c4b5fd; cursor: pointer; font-size: 0.82rem;
+      transition: all 0.2s;
+    }
+    .preset:hover { background: #2d2450; border-color: #9146ff; }
+  </style>
+</head>
+<body>
+
+  <h1>Video Streamer</h1>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('embed')">Cualquier URL</div>
+    <div class="tab" onclick="switchTab('twitch')">Twitch</div>
+    <div class="tab" onclick="switchTab('file')">Archivo local</div>
+    <div class="tab" onclick="switchTab('url')">URL / Stream</div>
+    <div class="tab" onclick="switchTab('camera')">Camara web</div>
+  </div>
+
+  <!-- Panel: Cualquier URL -->
+  <div class="panel active" id="panel-embed">
+    <div class="info-row">
+      <span class="badge badge-live">EMBED</span>
+      <span class="status">Pega cualquier URL y cargala dentro de esta pagina</span>
+    </div>
+
+    <div class="notice-warn">
+      Algunos sitios bloquean ser embebidos (YouTube, Google, etc.). Si ves pantalla en blanco, el sitio lo rechaza desde su lado y no hay forma de saltarlo desde el navegador.
+    </div>
+
+    <div class="url-row">
+      <input type="text" id="embed-url" placeholder="https://..." onkeydown="if(event.key==='Enter') loadEmbed()">
+      <button class="btn-primary" onclick="loadEmbed()">Cargar</button>
+    </div>
+
+    <div style="width:100%;max-width:860px;position:relative;">
+      <iframe
+        id="embed-frame"
+        class="player"
+        style="height:480px;"
+        allowfullscreen
+        allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+        referrerpolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-modals"
+      ></iframe>
+    </div>
+
+    <div class="controls">
+      <button class="btn-neutral" onclick="reloadEmbed()">Recargar</button>
+      <button class="btn-danger"  onclick="clearEmbed()">Limpiar</button>
+      <button class="btn-neutral" onclick="openInTab()">Abrir en nueva pesta&#241;a</button>
+    </div>
+  </div>
+
+  <!-- Panel: Twitch -->
+  <div class="panel active" id="panel-twitch">
+    <div class="info-row">
+      <span class="badge badge-twitch">TWITCH</span>
+      <span class="status">Ingresa el nombre del canal</span>
+    </div>
+
+    <div class="notice">
+      Twitch requiere servirse desde <code>localhost</code>. Si ves pantalla negra, en la terminal escribi:<br>
+      <code>python -m http.server 8080</code> &nbsp;y abrí &nbsp;<code>http://localhost:8080/video-stream.html</code>
+    </div>
+
+    <div class="url-row">
+      <input type="text" id="twitch-channel" placeholder="nombre del canal (ej: ibai, twitchrivals, esl_csgo)">
+      <button class="btn-twitch" onclick="loadTwitch()">Cargar</button>
+    </div>
+
+    <div class="presets">
+      <span class="preset" onclick="setChannel('ibai')">ibai</span>
+      <span class="preset" onclick="setChannel('auronplay')">auronplay</span>
+      <span class="preset" onclick="setChannel('esl_csgo')">esl_csgo</span>
+      <span class="preset" onclick="setChannel('twitchrivals')">twitchrivals</span>
+    </div>
+
+    <div id="twitch-container" style="width:100%;max-width:860px;">
+      <iframe id="twitch-player" class="player" allowfullscreen></iframe>
+    </div>
+  </div>
+
+  <!-- Panel: archivo local -->
+  <div class="panel" id="panel-file">
+    <div class="info-row">
+      <span class="badge badge-file">ARCHIVO</span>
+      <span class="status" id="file-name">Ningun archivo seleccionado</span>
+    </div>
+    <video id="video-file" controls></video>
+    <div class="controls">
+      <label class="file-label" for="file-input">Seleccionar video</label>
+      <input type="file" id="file-input" accept="video/*" onchange="loadFile(event)">
+    </div>
+  </div>
+
+  <!-- Panel: URL -->
+  <div class="panel" id="panel-url">
+    <div class="info-row">
+      <span class="badge badge-file">STREAM</span>
+      <span class="status">HLS (.m3u8), MP4, WebM, etc.</span>
+    </div>
+    <video id="video-url" controls></video>
+    <div class="url-row">
+      <input type="text" id="stream-url" placeholder="https://ejemplo.com/video.mp4  o  stream.m3u8">
+      <button class="btn-primary" onclick="loadUrl()">Cargar</button>
+    </div>
+    <div class="controls">
+      <button class="btn-neutral" onclick="document.getElementById('video-url').play()">Play</button>
+      <button class="btn-neutral" onclick="document.getElementById('video-url').pause()">Pausa</button>
+    </div>
+  </div>
+
+  <!-- Panel: camara -->
+  <div class="panel" id="panel-camera">
+    <div class="info-row">
+      <span class="badge badge-live" id="live-badge" style="display:none">EN VIVO</span>
+      <span class="status" id="cam-status">Camara inactiva</span>
+    </div>
+    <video id="video-camera" autoplay muted playsinline></video>
+    <div class="controls">
+      <button class="btn-primary" id="btn-start" onclick="startCamera()">Iniciar camara</button>
+      <button class="btn-danger"  id="btn-stop"  onclick="stopCamera()" disabled>Detener</button>
+      <button class="btn-neutral" id="btn-snap"  onclick="takeSnapshot()" disabled>Captura</button>
+    </div>
+  </div>
+
+  <canvas id="snap-canvas" style="display:none"></canvas>
+
+  <script>
+    // ── Tabs ──────────────────────────────────────────────
+    const tabNames = ['embed', 'twitch', 'file', 'url', 'camera'];
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach((t, i) => {
+        t.classList.toggle('active', tabNames[i] === name);
+      });
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('panel-' + name).classList.add('active');
+    }
+
+    // ── Embed cualquier URL ───────────────────────────────
+    function loadEmbed() {
+      let url = document.getElementById('embed-url').value.trim();
+      if (!url) return;
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      document.getElementById('embed-frame').src = url;
+    }
+
+    function reloadEmbed() {
+      const f = document.getElementById('embed-frame');
+      f.src = f.src;
+    }
+
+    function clearEmbed() {
+      document.getElementById('embed-frame').src = 'about:blank';
+      document.getElementById('embed-url').value = '';
+    }
+
+    function openInTab() {
+      const url = document.getElementById('embed-url').value.trim();
+      if (url) window.open(url, '_blank');
+    }
+
+    // ── Twitch ────────────────────────────────────────────
+    function setChannel(name) {
+      document.getElementById('twitch-channel').value = name;
+      loadTwitch();
+    }
+
+    function loadTwitch() {
+      const channel = document.getElementById('twitch-channel').value.trim();
+      if (!channel) return;
+
+      // parent debe coincidir con el dominio actual
+      const parent = window.location.hostname || 'localhost';
+      const src = `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${parent}&autoplay=true`;
+      document.getElementById('twitch-player').src = src;
+    }
+
+    // ── Archivo local ─────────────────────────────────────
+    function loadFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const vid = document.getElementById('video-file');
+      vid.src = URL.createObjectURL(file);
+      vid.play();
+      document.getElementById('file-name').textContent = file.name;
+    }
+
+    // ── URL / Stream ──────────────────────────────────────
+    function loadUrl() {
+      const url = document.getElementById('stream-url').value.trim();
+      if (!url) return;
+      const vid = document.getElementById('video-url');
+
+      if (url.includes('.m3u8')) {
+        if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+          vid.src = url;
+        } else if (window.Hls && Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(url);
+          hls.attachMedia(vid);
+        } else {
+          alert('Tu navegador no soporta HLS nativamente. Usa Safari o un MP4 directo.');
+          return;
+        }
+      } else {
+        vid.src = url;
+      }
+      vid.play().catch(() => {});
+    }
+
+    // ── Camara web ────────────────────────────────────────
+    let stream = null;
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const vid = document.getElementById('video-camera');
+        vid.srcObject = stream;
+        document.getElementById('btn-start').disabled = true;
+        document.getElementById('btn-stop').disabled  = false;
+        document.getElementById('btn-snap').disabled  = false;
+        document.getElementById('cam-status').textContent = 'Transmitiendo...';
+        document.getElementById('live-badge').style.display = 'inline';
+      } catch (err) {
+        alert('No se pudo acceder a la camara: ' + err.message);
+      }
+    }
+
+    function stopCamera() {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = null;
+      const vid = document.getElementById('video-camera');
+      vid.srcObject = null;
+      document.getElementById('btn-start').disabled = false;
+      document.getElementById('btn-stop').disabled  = true;
+      document.getElementById('btn-snap').disabled  = true;
+      document.getElementById('cam-status').textContent = 'Camara inactiva';
+      document.getElementById('live-badge').style.display = 'none';
+    }
+
+    function takeSnapshot() {
+      const vid    = document.getElementById('video-camera');
+      const canvas = document.getElementById('snap-canvas');
+      canvas.width  = vid.videoWidth;
+      canvas.height = vid.videoHeight;
+      canvas.getContext('2d').drawImage(vid, 0, 0);
+      const a = document.createElement('a');
+      a.download = 'captura-' + Date.now() + '.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }
+  </script>
+</body>
+</html>
