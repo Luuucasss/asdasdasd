@@ -239,6 +239,10 @@
       document.getElementById('panel-' + name).classList.add('active');
     }
 
+    // ── URL por defecto — EDITÁ ESTA LINEA ───────────────
+    const URL_DEFAULT = "";
+    // ─────────────────────────────────────────────────────
+
     // ── Embed cualquier URL ───────────────────────────────
     function loadEmbed() {
       let url = document.getElementById('embed-url').value.trim();
@@ -246,6 +250,14 @@
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
       document.getElementById('embed-frame').src = url;
     }
+
+    // Al cargar la página, si hay URL_DEFAULT la pone y la carga sola
+    window.addEventListener('DOMContentLoaded', () => {
+      if (URL_DEFAULT) {
+        document.getElementById('embed-url').value = URL_DEFAULT;
+        loadEmbed();
+      }
+    });
 
     function reloadEmbed() {
       const f = document.getElementById('embed-frame');
